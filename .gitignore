@@ -1,0 +1,9 @@
+.venv/
+.vscode/
+__pycache__/
+.ruff_cache/
+.env
+auth.http
+
+node_modules/
+build/

@@ -71,30 +71,49 @@ function App() {
   };
 
   const loginFacebook = () => {
+    if (!window.FB) {
+      console.warn("Facebook SDK not loaded yet!");
+      return;
+    }
+
     window.FB.login(
       (response) => {
-          if (response.authResponse) {
-              console.log('Login successful', response);
-              handleFacebookLogin(response.authResponse.accessToken);
-          } else {
-              console.log('User cancelled login or did not fully authorize.');
-          }
+        if (response.authResponse) {
+          console.log("Login successful", response);
+          handleFacebookLogin(response.authResponse.accessToken);
+        } else {
+          console.log("User cancelled login or did not fully authorize.");
+        }
       },
-      { scope: 'email,public_profile' }
-  );
+      { scope: "email,public_profile" }
+    );
+  };
+
+  const loadFacebookSDK = () => {
+    if (window.FB) return;
+
+    const script = document.createElement("script");
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    document.body.appendChild(script);
+
+    script.onload = () => {
+      window.fbAsyncInit = function () {
+        window.FB.init({
+          appId: "1149698593484172",
+          cookie: true,
+          xfbml: true,
+          version: "v12.0",
+        });
+        console.log("Facebook SDK initialized");
+      };
+    };
   };
 
   useEffect(() => {
-    window.fbAsyncInit = function () {
-      window.FB.init({
-        appId: "1149698593484172",
-        cookie: true,
-        xfbml: true,
-        version: "v12.0",
-      });
-
-      console.log("Facebook SDK initialized");
-    };
+    loadFacebookSDK();
   }, []);
 
   return (

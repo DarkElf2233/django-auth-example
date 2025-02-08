@@ -1,6 +1,6 @@
 import axios from "axios";
+import { useEffect } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import FacebookLogin from "@greatsumini/react-facebook-login";
 
 function App() {
   const handleSubmit = (e) => {
@@ -53,23 +53,49 @@ function App() {
     onSuccess: (tokenResponse) => handleGoogleLogin(tokenResponse),
   });
 
-  const handleFacebookLogin = async (response) => {
+  const handleFacebookLogin = async (accessToken) => {
     try {
-      console.log(response);
-
-      // const res = await axios.post("http://127.0.0.1:8000/auth/facebook/login/", {
-      //   token: response.access_token,
-      // });
-
-      // console.log("Successfully logged in using FACEBOOK!");
-      // console.log("Your access token: ", res.data.access_token);
-      // console.log("User: ", res.data.user);
-
-      // document.cookie = `access_token=${res.data.access_token};`;
+      const res = await axios.post(
+        "http://127.0.0.1:8000/auth/facebook/login/",
+        {
+          token: accessToken,
+        }
+      );
+      console.log("Successfully logged in using FACEBOOK!");
+      console.log("Your access token: ", res.data.access_token);
+      console.log("User: ", res.data.user);
+      document.cookie = `access_token=${res.data.access_token};`;
     } catch (err) {
       console.warn(err);
     }
   };
+
+  const loginFacebook = () => {
+    window.FB.login(
+      (response) => {
+          if (response.authResponse) {
+              console.log('Login successful', response);
+              handleFacebookLogin(response.authResponse.accessToken);
+          } else {
+              console.log('User cancelled login or did not fully authorize.');
+          }
+      },
+      { scope: 'email,public_profile' }
+  );
+  };
+
+  useEffect(() => {
+    window.fbAsyncInit = function () {
+      window.FB.init({
+        appId: "1149698593484172",
+        cookie: true,
+        xfbml: true,
+        version: "v12.0",
+      });
+
+      console.log("Facebook SDK initialized");
+    };
+  }, []);
 
   return (
     <div className="App">
@@ -95,13 +121,9 @@ function App() {
       </button>
       <br />
       <br />
-      <FacebookLogin
-        appId="appId"
-        onSuccess={handleFacebookLogin}
-        onFail={(error) => {
-          console.warn("Login Failed!", error);
-        }}
-      />
+      <button onClick={() => loginFacebook()} type="button">
+        Login with Facebook
+      </button>
       <br />
       <br />
       <hr />

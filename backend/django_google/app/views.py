@@ -1,4 +1,7 @@
 from django.db import transaction
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 
@@ -14,6 +17,7 @@ import datetime
 import environ
 import jwt
 import secrets
+import logging
 
 from app.serializers import UserSerializer
 from app.authentication import JWTAuthentication
@@ -120,6 +124,27 @@ class UserLogin(APIView):
 class AuthTemplateView(APIView):
     permission_classes = [AllowAny]
 
+    def send_welcome_email(self, email, username, password):
+        try:
+            subject = 'Welcome!'
+            html_message = render_to_string('welcome_email.html', {
+                'password': password,
+                'username': username,
+            })
+            plain_message = strip_tags(html_message)
+
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                html_message=html_message,
+                from_email=env('EMAIL_USER'),
+                recipient_list=[email],
+                fail_silently=True,
+            )
+
+        except Exception:
+            logging.warning('An error occurred while sending email, contact support for more info')
+
     def handle_auth(self, request, api_url, headers, token_field='token'):
         try:
             response = requests.get(api_url, headers=headers)
@@ -149,6 +174,8 @@ class AuthTemplateView(APIView):
                 password = make_password(new_password)
                 user = User.objects.create_user(
                     username=username, password=password, email=email, first_name=first_name, last_name=last_name)
+
+                self.send_welcome_email(email, username, new_password)
             if not user.is_active:
                 user.is_active = True
                 user.save()

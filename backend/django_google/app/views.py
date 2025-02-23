@@ -26,21 +26,23 @@ env = environ.Env()
 
 
 ### AUTH ###
-def create_token(email, password):
+def create_token(password, email=None, username=None):
     try:
-        user = User.objects.get(email=email)
+        if username is None:
+            user = User.objects.get(email=email)
+        elif email is None:
+            user = User.objects.get(username=username)
     except User.DoesNotExist:
         return {
             'status': 'invalid_data',
-            'message': 'Incorrect email or password.'
+            'message': 'Incorrect username or password.'
         }
 
-    if not user.check_password(password):
-        if user.check_password(make_password(password)):
-            return {
-                'status': 'invalid_data',
-                'message': 'Incorrect email or password.'
-            }
+    if email is None and not user.check_password(password):
+        return {
+            'status': 'invalid_data',
+            'message': 'Incorrect username or password.'
+        }
 
     now = datetime.datetime.now(datetime.timezone.utc)
     iat = int(now.timestamp())
@@ -101,10 +103,10 @@ class UserLogin(APIView):
     serializer_class = UserSerializer
 
     def post(self, request):
-        email = request.data['email']
+        username = request.data['username']
         password = request.data['password']
 
-        data = create_token(email, password)
+        data = create_token(username=username, password=password)
         token = data.get('access_token')
         if token is None:
             return Response(
@@ -180,7 +182,7 @@ class AuthTemplateView(APIView):
                 user.is_active = True
                 user.save()
 
-        token_data = create_token(user.email, user.password)
+        token_data = create_token(email=user.email, password=user.password)
         token = token_data.get('access_token')
         if token is None:
             return Response(

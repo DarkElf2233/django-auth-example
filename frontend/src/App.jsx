@@ -8,11 +8,9 @@ function App() {
 
     const form = e.currentTarget;
     const username = form[0].value;
-    const email = form[1].value;
-    const password = form[2].value;
+    const password = form[1].value;
     const data = {
       username: username,
-      email: email,
       password: password,
     };
     axios
@@ -122,10 +120,6 @@ function App() {
       <form onSubmit={handleSubmit}>
         <label htmlFor="username">Username:</label>
         <input type="text" name="username" />
-        <br />
-        <br />
-        <label htmlFor="email">Email:</label>
-        <input type="text" name="email" />
         <br />
         <br />
         <label htmlFor="password">Password:</label>

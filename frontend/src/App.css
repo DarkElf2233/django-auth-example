@@ -1,0 +1,36 @@
+
+input {
+    width: 150px;
+    margin-top: 6px;
+}
+
+textarea {
+    width: 200px;
+    height: 80px;
+}
+
+button {
+    padding: 5px 8px;
+    margin-top: 7px;
+}
+
+label {
+    display: inline-block;
+    margin-top: 6px;
+    height: 21px;
+    width: 100%;
+}
+
+.form {
+    display: flex;
+    gap: 10px;
+    flex-direction: row;
+}
+
+.labels {
+    width: 80px;
+}
+
+.inputs {
+    width: 100px;
+}

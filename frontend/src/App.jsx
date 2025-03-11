@@ -1,8 +1,65 @@
 import axios from "axios";
-import { useEffect } from "react";
+import "./App.css";
+import { useEffect, useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 
 function App() {
+  const [user, setUser] = useState({});
+  const [usernameInput, setUsernameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+
+  const handleChangeUsername = (e) => {
+    setUsernameInput(e.target.value);
+  };
+
+  const handleChangeEmail = (e) => {
+    setEmailInput(e.target.value);
+  };
+
+  const handleChangeUser = (e) => {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const username = form[0].value;
+    const email = form[1].value;
+
+    axios.put(`http://localhost:8000/auth/users/${user.id}`, {
+      email: email,
+      username: username,
+    });
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const firstName = form[0].value;
+    const lastName = form[1].value;
+    const email = form[2].value;
+    const phone = form[3].value;
+    const message = form[4].value;
+
+    axios
+      .post(
+        "http://localhost:8000/mail/",
+        {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone: phone,
+          message: message,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      .then((res) => {
+        console.log(res.data.message);
+      });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -25,6 +82,10 @@ function App() {
         console.log("User: ", res.data.user);
 
         document.cookie = `access_token=${res.data.access_token}`;
+
+        setUser(res.data.user);
+        setUsernameInput(res.data.user.username);
+        setEmailInput(res.data.user.email);
       })
       .catch((err) => {
         console.warn(err);
@@ -42,6 +103,10 @@ function App() {
       console.log("User: ", res.data.user);
 
       document.cookie = `access_token=${res.data.access_token};`;
+
+      setUser(res.data.user);
+      setUsernameInput(res.data.user.username);
+      setEmailInput(res.data.user.email);
     } catch (err) {
       console.warn(err);
     }
@@ -63,6 +128,10 @@ function App() {
       console.log("Your access token: ", res.data.access_token);
       console.log("User: ", res.data.user);
       document.cookie = `access_token=${res.data.access_token};`;
+
+      setUser(res.data.user);
+      setUsernameInput(res.data.user.username);
+      setEmailInput(res.data.user.email);
     } catch (err) {
       console.warn(err);
     }
@@ -133,13 +202,44 @@ function App() {
         Login with Google
       </button>
       <br />
-      <br />
       <button onClick={() => loginFacebook()} type="button">
         Login with Facebook
       </button>
       <br />
       <br />
+      <h3>Current User / Change User:</h3>
+      <p>Id: {user.id}</p>
+      <form onSubmit={handleChangeUser}>
+        <label htmlFor="changeUsername">Username:</label>
+        <input type="text" name="changeUsername" value={usernameInput} onChange={handleChangeUsername} />
+
+        <label htmlFor="changeEmail">Email:</label>
+        <input type="text" name="changeEmail" value={emailInput} onChange={handleChangeEmail} />
+
+        <br />
+        <button type="submit">Submit</button>
+      </form>
       <hr />
+      <br />
+      <form onSubmit={handleSendMessage}>
+        <label htmlFor="first_name">First name:</label>
+        <input type="text" name="first_name" />
+
+        <label htmlFor="last_name">Last name:</label>
+        <input type="text" name="last_name" />
+
+        <label htmlFor="email">Email:</label>
+        <input type="text" name="email" />
+
+        <label htmlFor="phone">Phone:</label>
+        <input type="text" name="phone" />
+
+        <label htmlFor="message">Message:</label>
+        <textarea name="message" id="message"></textarea>
+
+        <br />
+        <button type="submit">Submit</button>
+      </form>
     </div>
   );
 }

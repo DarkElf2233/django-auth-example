@@ -1,12 +1,13 @@
 import axios from "axios";
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 
 function App() {
   const [user, setUser] = useState({});
   const [usernameInput, setUsernameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
+  const [token, setToken] = useState("");
 
   const handleChangeUsername = (e) => {
     setUsernameInput(e.target.value);
@@ -16,6 +17,17 @@ function App() {
     setEmailInput(e.target.value);
   };
 
+  const getCurrentUser = () => {
+    axios.get(`http://localhost:8000/auth/users/${user.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }).then((res) => {
+      setEmailInput(res.data.email)
+      setUsernameInput(res.data.username)
+    })
+  }
+
   const handleChangeUser = (e) => {
     e.preventDefault();
 
@@ -23,10 +35,18 @@ function App() {
     const username = form[0].value;
     const email = form[1].value;
 
-    axios.put(`http://localhost:8000/auth/users/${user.id}`, {
-      email: email,
-      username: username,
-    });
+    axios.put(
+      `http://localhost:8000/auth/users/${user.id}`,
+      {
+        email: email,
+        username: username,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
   };
 
   const handleSendMessage = (e) => {
@@ -60,7 +80,7 @@ function App() {
       });
   };
 
-  const handleSubmit = (e) => {
+  const handleBaseLogin = (e) => {
     e.preventDefault();
 
     const form = e.currentTarget;
@@ -81,11 +101,8 @@ function App() {
         console.log("Your access token: ", res.data.access_token);
         console.log("User: ", res.data.user);
 
-        document.cookie = `access_token=${res.data.access_token}`;
-
         setUser(res.data.user);
-        setUsernameInput(res.data.user.username);
-        setEmailInput(res.data.user.email);
+        setToken(res.data.access_token);
       })
       .catch((err) => {
         console.warn(err);
@@ -102,11 +119,8 @@ function App() {
       console.log("Your access token: ", res.data.access_token);
       console.log("User: ", res.data.user);
 
-      document.cookie = `access_token=${res.data.access_token};`;
-
       setUser(res.data.user);
-      setUsernameInput(res.data.user.username);
-      setEmailInput(res.data.user.email);
+      setToken(res.data.access_token);
     } catch (err) {
       console.warn(err);
     }
@@ -116,77 +130,10 @@ function App() {
     onSuccess: (tokenResponse) => handleGoogleLogin(tokenResponse),
   });
 
-  const handleFacebookLogin = async (accessToken) => {
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/auth/facebook/login/",
-        {
-          token: accessToken,
-        }
-      );
-      console.log("Successfully logged in using FACEBOOK!");
-      console.log("Your access token: ", res.data.access_token);
-      console.log("User: ", res.data.user);
-      document.cookie = `access_token=${res.data.access_token};`;
-
-      setUser(res.data.user);
-      setUsernameInput(res.data.user.username);
-      setEmailInput(res.data.user.email);
-    } catch (err) {
-      console.warn(err);
-    }
-  };
-
-  const loginFacebook = () => {
-    if (!window.FB) {
-      console.warn("Facebook SDK not loaded yet!");
-      return;
-    }
-
-    window.FB.login(
-      (response) => {
-        if (response.authResponse) {
-          console.log("Login successful", response);
-          handleFacebookLogin(response.authResponse.accessToken);
-        } else {
-          console.log("User cancelled login or did not fully authorize.");
-        }
-      },
-      { scope: "email,public_profile" }
-    );
-  };
-
-  const loadFacebookSDK = () => {
-    if (window.FB) return;
-
-    const script = document.createElement("script");
-    script.src = "https://connect.facebook.net/en_US/sdk.js";
-    script.async = true;
-    script.defer = true;
-    script.crossOrigin = "anonymous";
-    document.body.appendChild(script);
-
-    script.onload = () => {
-      window.fbAsyncInit = function () {
-        window.FB.init({
-          appId: "1149698593484172",
-          cookie: true,
-          xfbml: true,
-          version: "v12.0",
-        });
-        console.log("Facebook SDK initialized");
-      };
-    };
-  };
-
-  useEffect(() => {
-    loadFacebookSDK();
-  }, []);
-
   return (
     <div className="App">
-      <br />
-      <form onSubmit={handleSubmit}>
+      <h3>Base Login:</h3>
+      <form onSubmit={handleBaseLogin}>
         <label htmlFor="username">Username:</label>
         <input type="text" name="username" />
         <br />
@@ -202,25 +149,35 @@ function App() {
         Login with Google
       </button>
       <br />
-      <button onClick={() => loginFacebook()} type="button">
-        Login with Facebook
-      </button>
       <br />
-      <br />
+      <hr />
       <h3>Current User / Change User:</h3>
+
+      <button onClick={getCurrentUser}>Get Current User</button>
+
       <p>Id: {user.id}</p>
       <form onSubmit={handleChangeUser}>
         <label htmlFor="changeUsername">Username:</label>
-        <input type="text" name="changeUsername" value={usernameInput} onChange={handleChangeUsername} />
+        <input
+          type="text"
+          name="changeUsername"
+          value={usernameInput}
+          onChange={handleChangeUsername}
+        />
 
         <label htmlFor="changeEmail">Email:</label>
-        <input type="text" name="changeEmail" value={emailInput} onChange={handleChangeEmail} />
+        <input
+          type="text"
+          name="changeEmail"
+          value={emailInput}
+          onChange={handleChangeEmail}
+        />
 
         <br />
         <button type="submit">Submit</button>
       </form>
       <hr />
-      <br />
+      <h3>Contact us:</h3>
       <form onSubmit={handleSendMessage}>
         <label htmlFor="first_name">First name:</label>
         <input type="text" name="first_name" />

@@ -311,7 +311,8 @@ class UserDetail(APIView):
     Retrieve, update or delete a user.
     """
 
-    permission_classes = [AllowAny]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     serializer_class = UserSerializer
 
@@ -323,11 +324,13 @@ class UserDetail(APIView):
 
     def get(self, request, pk, format=None):
         user = self.get_object(pk)
+        self.check_object_permissions(request, user)
         user_serializer = UserSerializer(user)
         return Response(user_serializer.data)
 
     def put(self, request, pk, format=None):
         user = self.get_object(pk)
+        self.check_object_permissions(request, user)
         user_serializer = UserSerializer(user, data=request.data)
         if user_serializer.is_valid():
             user_serializer.save()
@@ -336,6 +339,7 @@ class UserDetail(APIView):
 
     def delete(self, request, pk, format=None):
         user = self.get_object(pk)
+        self.check_object_permissions(request, user)
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

@@ -10,9 +10,9 @@ env = environ.Env()
 
 class JWTAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        token = request.COOKIES.get("access_token")
-
-        if not token:
+        try:
+            token = request.headers.get('Authorization', '').split()[1]
+        except IndexError:
             return None
 
         try:

@@ -21,7 +21,7 @@ def get_app_list(self, request, app_label=None):
     return app_list
 
 
-admin.AdminSite.get_app_list = get_app_list
+# admin.AdminSite.get_app_list = get_app_list
 
 
 @admin.register(Model1)

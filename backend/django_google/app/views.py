@@ -21,7 +21,7 @@ import jwt
 import secrets
 import logging
 
-from app.serializers import UserSerializer
+from app.serializers import UserSerializer, UserUpdateSerializer
 from app.authentication import JWTAuthentication
 
 env = environ.Env()
@@ -92,6 +92,24 @@ def send_test_email(first_name, last_name, email, phone, message):
         html_message=html_message,
         from_email=env("EMAIL_USER"),
         recipient_list=['fd.melnik@yandex.ru'],
+        fail_silently=True,
+    )
+
+
+def send_password_notification_email(email):
+    subject = "Account password changed"
+    html_message = render_to_string(
+        "password_notification_email.html"
+    )
+
+    plain_message = strip_tags(html_message)
+
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        html_message=html_message,
+        from_email=env("EMAIL_USER"),
+        recipient_list=[email],
         fail_silently=True,
     )
 
@@ -314,7 +332,7 @@ class UserDetail(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    serializer_class = UserSerializer
+    serializer_class = UserUpdateSerializer
 
     def get_object(self, pk):
         try:
@@ -325,13 +343,21 @@ class UserDetail(APIView):
     def get(self, request, pk, format=None):
         user = self.get_object(pk)
         self.check_object_permissions(request, user)
-        user_serializer = UserSerializer(user)
+        user_serializer = UserUpdateSerializer(user)
         return Response(user_serializer.data)
 
     def put(self, request, pk, format=None):
         user = self.get_object(pk)
         self.check_object_permissions(request, user)
-        user_serializer = UserSerializer(user, data=request.data)
+
+        if request.data['password'] == '':
+            request.data['password'] = user.password
+        else:
+            request.data['password'] = make_password(request.data['password'])
+
+            send_password_notification_email(email=user.email)
+
+        user_serializer = UserUpdateSerializer(user, data=request.data)
         if user_serializer.is_valid():
             user_serializer.save()
             return Response(user_serializer.data)
@@ -342,5 +368,3 @@ class UserDetail(APIView):
         self.check_object_permissions(request, user)
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-

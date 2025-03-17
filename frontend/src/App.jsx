@@ -6,40 +6,41 @@ import { useGoogleLogin } from "@react-oauth/google";
 function App() {
   const [user, setUser] = useState({});
   const [usernameInput, setUsernameInput] = useState("");
-  const [emailInput, setEmailInput] = useState("");
   const [token, setToken] = useState("");
 
   const handleChangeUsername = (e) => {
     setUsernameInput(e.target.value);
   };
 
-  const handleChangeEmail = (e) => {
-    setEmailInput(e.target.value);
-  };
-
   const getCurrentUser = () => {
-    axios.get(`http://localhost:8000/auth/users/${user.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }).then((res) => {
-      setEmailInput(res.data.email)
-      setUsernameInput(res.data.username)
-    })
-  }
+    axios
+      .get(`http://localhost:8000/auth/users/${user.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        setUser(res.data);
+        setUsernameInput(res.data.username);
+      });
+  };
 
   const handleChangeUser = (e) => {
     e.preventDefault();
 
     const form = e.currentTarget;
     const username = form[0].value;
-    const email = form[1].value;
+    let password = form[1].value;
+
+    if (!password) {
+      password = "";
+    }
 
     axios.put(
       `http://localhost:8000/auth/users/${user.id}`,
       {
-        email: email,
         username: username,
+        password: password,
       },
       {
         headers: {
@@ -101,7 +102,7 @@ function App() {
         console.log("Your access token: ", res.data.access_token);
         console.log("User: ", res.data.user);
 
-        setUser(res.data.user);
+        setUser(res.data);
         setToken(res.data.access_token);
       })
       .catch((err) => {
@@ -155,7 +156,6 @@ function App() {
 
       <button onClick={getCurrentUser}>Get Current User</button>
 
-      <p>Id: {user.id}</p>
       <form onSubmit={handleChangeUser}>
         <label htmlFor="changeUsername">Username:</label>
         <input
@@ -164,15 +164,8 @@ function App() {
           value={usernameInput}
           onChange={handleChangeUsername}
         />
-
-        <label htmlFor="changeEmail">Email:</label>
-        <input
-          type="text"
-          name="changeEmail"
-          value={emailInput}
-          onChange={handleChangeEmail}
-        />
-
+        <label htmlFor="changePassword">Password:</label>
+        <input type="text" name="changePassword" />
         <br />
         <button type="submit">Submit</button>
       </form>

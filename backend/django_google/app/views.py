@@ -1,8 +1,9 @@
 from django.db import transaction
 from django.core.mail import send_mail
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+from django.core.cache import cache
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 
@@ -114,10 +115,26 @@ def send_password_notification_email(email):
     )
 
 
+def rate_limit(limit=10, timeout=300):
+    def decorator(view_func):
+        def wrapped_view(self, request, *args, **kwargs):
+            ip = request.META.get('REMOTE_ADDR')
+            key = f'rate_limit_{ip}'
+
+            request_count = cache.get(key, 0)
+            if request_count >= limit:
+                return JsonResponse({'error': 'Bad Request.'}, status=400)
+
+            cache.set(key, request_count + 1, timeout)
+            return view_func(self, request, *args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
 class SendEmail(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [AnonRateThrottle]
 
+    @rate_limit(limit=2, timeout=300)
     def post(self, request):
         first_name = request.data["first_name"]
         last_name = request.data["last_name"]

@@ -12,6 +12,11 @@ urlpatterns = [
     path("auth/base/register/", views.UserRegister.as_view(), name="base_login"),
     path("auth/users/", views.UserList.as_view(), name="user_list"),
     path("auth/users/<int:pk>", views.UserDetail.as_view(), name="user_detail"),
-
-    path('mail/', views.SendEmail().as_view(), name='send_email'),
+    path("auth/change-email/", views.ChangeEmailView.as_view(), name="change-email"),
+    path(
+        "auth/confirm-email/<str:token>/",
+        views.ConfirmEmailView.as_view(),
+        name="confirm-email",
+    ),
+    path("contactus/", views.SendEmail().as_view(), name="send_email"),
 ]

@@ -1,11 +1,8 @@
 from django.db import transaction
-from django.core.mail import send_mail
-from django.http import Http404, JsonResponse
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-from django.core.cache import cache
-from django.contrib.auth.models import User
+from django.http import Http404
+from django.contrib.auth.models import User, Permission
 from django.contrib.auth.hashers import make_password
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.generics import CreateAPIView
@@ -13,122 +10,69 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-from rest_framework.throttling import AnonRateThrottle
 
 import requests
-import datetime
+
 import environ
-import jwt
 import secrets
-import logging
+import jwt
 
 from app.serializers import UserSerializer, UserUpdateSerializer
 from app.authentication import JWTAuthentication
+from app.utils import (
+    create_auth_token,
+    create_username,
+    send_password_notification_email,
+    send_test_email,
+    rate_limit,
+    send_welcome_email,
+    generate_email_change_token,
+    send_confirmation_email,
+)
 
 env = environ.Env()
 
 
 ### AUTH ###
-def create_token(password, email=None, username=None):
-    try:
-        if username is None:
-            user = User.objects.get(email=email)
-        elif email is None:
-            user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        return {"status": "invalid_data", "message": "Incorrect username or password."}
-
-    if email is None and not user.check_password(password):
-        return {"status": "invalid_data", "message": "Incorrect username or password."}
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-    iat = int(now.timestamp())
-    exp = int((now + datetime.timedelta(minutes=env.int("TOKEN_EXP_MIN"))).timestamp())
-
-    payload = {
-        "id": user.id,
-        "email": user.email,
-        "exp": exp,
-        "iat": iat,
-    }
-
-    token = jwt.encode(payload, key=env("TOKEN_SECRET"), algorithm="HS256")
-    user_serializer = UserSerializer(user)
-
-    return {
-        "access_token": token,
-        "exp": datetime.datetime.fromtimestamp(exp),
-        "user": user_serializer.data,
-    }
 
 
-def create_username(email):
-    try:
-        email_split = email.split("@")
-        email_part = email_split[0]
-        username = f"{email_part.lower()}_{secrets.token_hex(5)}"
-        return username
-    except Exception as e:
-        raise Exception("Error while creating a new username") from e
+class ChangeEmailView(APIView):
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request):
+        new_email = request.data.get("new_email")
+        user_id = request.data.get("user_id")
+        user = User.objects.get(id=user_id)
+        token = generate_email_change_token(user, new_email)
+        send_confirmation_email(user, token)
+
+        return Response(
+            {"detail": "Confirmation email sent."}, status=status.HTTP_200_OK
+        )
 
 
-def send_test_email(first_name, last_name, email, phone, message):
-    subject = "Test Email."
-    html_message = render_to_string(
-        "test_email.html",
-        {
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email,
-            "phone": phone,
-            "message": message,
-        },
-    )
+class ConfirmEmailView(APIView):
+    authentication_classes = [AllowAny]
 
-    plain_message = strip_tags(html_message)
+    def get(self, request, token):
+        try:
+            payload = jwt.decode(token, key=env("TOKEN_SECRET"), algorithms=["HS256"])
+            user_id = payload["user_id"]
+            new_email = payload["new_email"]
 
-    send_mail(
-        subject=subject,
-        message=plain_message,
-        html_message=html_message,
-        from_email=env("EMAIL_USER"),
-        recipient_list=['fd.melnik@yandex.ru'],
-        fail_silently=True,
-    )
+            user = User.objects.get(id=user_id)
+            user.email = new_email
+            user.save()
 
+            return Response(
+                {"detail": "Email successfully updated."}, status=status.HTTP_200_OK
+            )
 
-def send_password_notification_email(email):
-    subject = "Account password changed"
-    html_message = render_to_string(
-        "password_notification_email.html"
-    )
-
-    plain_message = strip_tags(html_message)
-
-    send_mail(
-        subject=subject,
-        message=plain_message,
-        html_message=html_message,
-        from_email=env("EMAIL_USER"),
-        recipient_list=[email],
-        fail_silently=True,
-    )
-
-
-def rate_limit(limit=10, timeout=300):
-    def decorator(view_func):
-        def wrapped_view(self, request, *args, **kwargs):
-            ip = request.META.get('REMOTE_ADDR')
-            key = f'rate_limit_{ip}'
-
-            request_count = cache.get(key, 0)
-            if request_count >= limit:
-                return JsonResponse({'error': 'Bad Request.'}, status=400)
-
-            cache.set(key, request_count + 1, timeout)
-            return view_func(self, request, *args, **kwargs)
-        return wrapped_view
-    return decorator
+        except Exception:
+            return Response(
+                {"detail": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class SendEmail(APIView):
@@ -144,7 +88,7 @@ class SendEmail(APIView):
 
         send_test_email(first_name, last_name, email, phone, message)
 
-        return Response({'message': 'Successfully sent test email.'})
+        return Response({"message": "Successfully sent test email."})
 
 
 class UserRegister(CreateAPIView):
@@ -182,7 +126,7 @@ class UserLogin(APIView):
         username = request.data["username"]
         password = request.data["password"]
 
-        data = create_token(username=username, password=password)
+        data = create_auth_token(username=username, password=password)
         token = data.get("access_token")
         if token is None:
             return Response(
@@ -201,32 +145,6 @@ class UserLogin(APIView):
 
 class AuthTemplateView(APIView):
     permission_classes = [AllowAny]
-
-    def send_welcome_email(self, email, username, password):
-        try:
-            subject = "Welcome!"
-            html_message = render_to_string(
-                "welcome_email.html",
-                {
-                    "password": password,
-                    "username": username,
-                },
-            )
-            plain_message = strip_tags(html_message)
-
-            send_mail(
-                subject=subject,
-                message=plain_message,
-                html_message=html_message,
-                from_email=env("EMAIL_USER"),
-                recipient_list=[email],
-                fail_silently=True,
-            )
-
-        except Exception:
-            logging.warning(
-                "An error occurred while sending email, contact support for more info"
-            )
 
     def handle_auth(self, request, api_url, headers, token_field="token"):
         try:
@@ -276,12 +194,12 @@ class AuthTemplateView(APIView):
                     last_name=last_name,
                 )
 
-                self.send_welcome_email(email, username, new_password)
+                send_welcome_email(email, username, new_password)
             if not user.is_active:
                 user.is_active = True
                 user.save()
 
-        token_data = create_token(email=user.email, password=user.password)
+        token_data = create_auth_token(email=user.email, password=user.password)
         token = token_data.get("access_token")
         if token is None:
             return Response(
@@ -367,10 +285,10 @@ class UserDetail(APIView):
         user = self.get_object(pk)
         self.check_object_permissions(request, user)
 
-        if request.data['password'] == '':
-            request.data['password'] = user.password
+        if request.data["password"] == "":
+            request.data["password"] = user.password
         else:
-            request.data['password'] = make_password(request.data['password'])
+            request.data["password"] = make_password(request.data["password"])
 
             send_password_notification_email(email=user.email)
 

@@ -11,12 +11,20 @@ def get_app_list(self, request, app_label=None):
 
     app_list = list(app_dict.values())
 
-    app_list.append({'name': 'Analitics', 'app_label': 'analitics', 'app_url': '/admin/app/', 'has_module_perms': True, 'models': []})
+    app_list.append(
+        {
+            "name": "Analitics",
+            "app_label": "analitics",
+            "app_url": "/admin/app/",
+            "has_module_perms": True,
+            "models": [],
+        }
+    )
 
-    model2 = app_list[1]['models'][1]
-    app_list[1]['models'].remove(model2)
+    model2 = app_list[1]["models"][1]
+    app_list[1]["models"].remove(model2)
 
-    app_list[-1]['models'].append(model2)
+    app_list[-1]["models"].append(model2)
 
     return app_list
 

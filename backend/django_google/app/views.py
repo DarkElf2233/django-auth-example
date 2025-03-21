@@ -1,8 +1,7 @@
 from django.db import transaction
 from django.http import Http404
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
-from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.generics import CreateAPIView
@@ -38,6 +37,7 @@ env = environ.Env()
 
 class ChangeEmailView(APIView):
     authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         new_email = request.data.get("new_email")
@@ -52,7 +52,7 @@ class ChangeEmailView(APIView):
 
 
 class ConfirmEmailView(APIView):
-    authentication_classes = [AllowAny]
+    permission_classes = [AllowAny]
 
     def get(self, request, token):
         try:

@@ -31,7 +31,7 @@ def send_confirmation_email(user, token):
         subject = "Confirm your new email"
 
         html_message = render_to_string(
-            "password_change_notification.html",
+            "email_change_confirmation.html",
             {
                 "token": token,
             },
